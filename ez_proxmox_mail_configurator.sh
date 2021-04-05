@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 # Tonton Jo - 2021
 # Join me on Youtube: https://www.youtube.com/c/tontonjo
@@ -18,10 +18,10 @@
 # wget https://raw.githubusercontent.com/Tontonjo/proxmox/master/ez_proxmox_mail_configurator.sh
 # bash ez_proxmox_mail_configurator.sh
 
-# GMAIL: you need to allow less secure applications: 
+# GMAIL: you need to allow less secure applications:
 # https://myaccount.google.com/lesssecureapps
 
-# Sources: 
+# Sources:
 # https://forum.proxmox.com/threads/how-do-i-set-the-mail-server-to-be-used-in-proxmox.23669/
 # https://linuxscriptshub.com/configure-smtp-with-gmail-using-postfix/
 # https://suoption_pickedpport.google.com/accounts/answer/6010255
@@ -103,7 +103,7 @@ show_menu(){
 			read 'varmailusername'
 			echo "What is the AUTHENTIFICATION PASSWORD?: "
 			read 'varmailpassword'
-			read -p  "Is the SENDER mail address the same as the AUTHENTIFICATION USERNAME? y to use $varmailusername enter to set something else: " -n 1 -r 
+			read -p  "Is the SENDER mail address the same as the AUTHENTIFICATION USERNAME? y to use $varmailusername enter to set something else: " -n 1 -r
 			if [[ $REPLY =~ ^[Yy]$ ]]; then
 			varsenderaddress=$varmailusername
 			else
@@ -111,14 +111,14 @@ show_menu(){
 			read 'varsenderaddress'
 			fi
 			echo " "
-			read -p  "Use TLS?: y = yes / anything=no: " -n 1 -r 
+			read -p  "Use TLS?: y = yes / anything=no: " -n 1 -r
 			if [[ $REPLY =~ ^[Yy]$ ]]; then
 			vartls=yes
 			else
 			vartls=no
 			fi
-					
-			
+
+
 		echo "- Working on it!"
 		echo " "
 		echo "- Setting Aliases"
@@ -129,26 +129,35 @@ show_menu(){
 		else
 			echo "- No root alias found: Adding"
 			echo "root: $varrootmail" >> /etc/aliases
-			
+
 		fi
-		
+
 		#Setting canonical file for sender - :
 		echo "root $varsenderaddress" > /etc/postfix/canonical
 		chmod 600 /etc/postfix/canonical
-		
+
 		# Preparing for password hash
 		echo [$varmailserver]:$varmailport $varmailusername:$varmailpassword > /etc/postfix/sasl_passwd
-		chmod 600 /etc/postfix/sasl_passwd 
-		
+		chmod 600 /etc/postfix/sasl_passwd
+
 		# Add mailserver in main.cf
 		sed -i "/#/!s/\(relayhost[[:space:]]*=[[:space:]]*\)\(.*\)/\1"[$varmailserver]:"$varmailport""/"  /etc/postfix/main.cf
-		
+
 		# Checking TLS settings
 		echo "- Setting correct TLS Settings: $vartls"
 		postconf smtp_use_tls=$vartls
-		
+
+		if [ "x$vartls" == "xyes" ] && [ $varmailport -eq 465 ]
+			then
+            echo "- enforce legacy SMTPS protocol for port 465"
+			# Request that the Postfix SMTP client connects using the legacy SMTPS protocol instead of using the STARTTLS command.
+			postconf smtp_tls_wrappermode=yes
+			postconf smtp_tls_security_level=encrypt
+		fi
+
+
 		# Checking for password hash entry
-			if grep "smtp_sasl_password_maps" /etc/postfix/main.cf
+		if grep "smtp_sasl_password_maps" /etc/postfix/main.cf
 			then
 			echo "- Password hash already setted-up"
 		else
@@ -175,13 +184,13 @@ show_menu(){
 			echo "- Authentification already enabled"
 			else
 			postconf smtp_sasl_auth_enable=yes
-		fi 
+		fi
 		if grep "sender_canonical_maps" /etc/postfix/main.cf
 			then
 			echo "- Canonical entry already existing"
 			else
 			postconf sender_canonical_maps=hash:/etc/postfix/canonical
-		fi 
+		fi
 		
 		echo "- Encrypting password and canonical entry"
 		postmap /etc/postfix/sasl_passwd
@@ -244,7 +253,7 @@ show_menu(){
 					systemctl restart postfix
 					echo "- Restoration done"
 			fi
-  
+
 	  show_menu;
 	     ;;
 
